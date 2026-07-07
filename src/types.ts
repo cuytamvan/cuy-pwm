@@ -1,12 +1,18 @@
 export type CredentialType =
   'github' | 'gitlab' | 'gmail' | 'bank' | 'website' | 'ssh_cred' | 'ssh_key';
 
+export interface CredUser {
+  id: string;
+  name: string;
+}
+
 export interface BaseEntry {
   id: string;
   type: CredentialType;
   source: string;
   description: string;
   createdAt: string;
+  cred_user_id: string | null;
 }
 
 /**

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import boxen from 'boxen';
 import Table from 'cli-table3';
-import type { PasswordEntry, CredentialType } from './types';
+import type { PasswordEntry, CredentialType, CredUser } from './types';
 
 /* ------------------------------------------------------------------ */
 /*  Gradient text util (dipakai buat banner ASCII biar nggak flat)     */
@@ -172,15 +172,24 @@ function entryUsernameCol(e: PasswordEntry): string {
   return e.username;
 }
 
-export function entriesTable(entries: PasswordEntry[]): string {
+export function entriesTable(
+  entries: PasswordEntry[],
+  users?: CredUser[],
+): string {
+  const userMap = new Map((users ?? []).map((u) => [u.id, u.name]));
+  const showUser = users !== undefined;
+
+  const head = [
+    chalk.bold.cyan('Tipe'),
+    chalk.bold.cyan('Source'),
+    chalk.bold.cyan('Username / Info'),
+    chalk.bold.cyan('Deskripsi'),
+    chalk.bold.cyan('Dibuat'),
+  ];
+  if (showUser) head.push(chalk.bold.cyan('User'));
+
   const table = new Table({
-    head: [
-      chalk.bold.cyan('Tipe'),
-      chalk.bold.cyan('Source'),
-      chalk.bold.cyan('Username / Info'),
-      chalk.bold.cyan('Deskripsi'),
-      chalk.bold.cyan('Dibuat'),
-    ],
+    head,
     style: { head: [], border: ['dim'] },
     wordWrap: true,
   });
@@ -196,13 +205,20 @@ export function entriesTable(entries: PasswordEntry[]): string {
       }),
     );
 
-    table.push([
+    const row = [
       typeCol,
       chalk.whiteBright(truncate(e.source, 24)),
       entryUsernameCol(e),
       truncate(e.description, 28),
       createdCol,
-    ]);
+    ];
+    if (showUser) {
+      const userName = e.cred_user_id
+        ? (userMap.get(e.cred_user_id) ?? chalk.dim('?'))
+        : chalk.dim('-');
+      row.push(chalk.whiteBright(userName));
+    }
+    table.push(row);
   });
 
   const header = chalk.dim(

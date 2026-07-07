@@ -14,6 +14,10 @@ import {
   addEntry,
   deleteEntry,
   updateEntry,
+  loadUsers,
+  addUser,
+  updateUser,
+  deleteUser,
   newId,
 } from './store';
 import { promptGeneratePassword } from './generator';
@@ -33,6 +37,7 @@ import type {
   SshKeyEntry,
   CredentialType,
   PasswordEntry,
+  CredUser,
 } from './types';
 
 function checkCancel<T>(value: T | symbol): T {
@@ -65,6 +70,7 @@ async function main() {
           { value: 'list', label: `List Semua Credential` },
           { value: 'view', label: `Lihat Credential` },
           { value: 'generate', label: `Generate Password` },
+          { value: 'users', label: `Manage Users` },
           { value: 'exit', label: `Keluar` },
         ],
       }),
@@ -80,6 +86,7 @@ async function main() {
       else if (action === 'list') await listCredentialsFlow();
       else if (action === 'view') await viewCredentialFlow();
       else if (action === 'generate') await generatePasswordFlow();
+      else if (action === 'users') await manageUsersFlow();
     } catch (err) {
       p.log.error(chalk.red(String(err instanceof Error ? err.message : err)));
     }
@@ -119,6 +126,21 @@ async function addCredentialFlow() {
       options: credentialTypeOptions(),
     }),
   ) as CredentialType;
+
+  const users = loadUsers();
+  let cred_user_id: string | null = null;
+  if (users.length) {
+    const userChoice = checkCancel(
+      await p.select({
+        message: 'Kaitkan dengan user?',
+        options: [
+          { value: '__none__', label: chalk.dim('— Tanpa User —') },
+          ...users.map((u) => ({ value: u.id, label: u.name })),
+        ],
+      }),
+    ) as string;
+    cred_user_id = userChoice === '__none__' ? null : userChoice;
+  }
 
   const publicKey = readPublicKey();
   const id = newId();
@@ -164,6 +186,7 @@ async function addCredentialFlow() {
       source,
       description: description || '',
       createdAt,
+      cred_user_id,
       encrypted_private_key: encryptData(publicKey, privateKeyContent),
       public_key: publicKeyContent,
     };
@@ -207,6 +230,7 @@ async function addCredentialFlow() {
       source,
       description: description || '',
       createdAt,
+      cred_user_id,
       host,
       port: Number(portInput || '22'),
       username,
@@ -259,6 +283,7 @@ async function addCredentialFlow() {
     source,
     description: description || '',
     createdAt,
+    cred_user_id,
     username,
     encrypted_password: encryptData(publicKey, password),
     extra,
@@ -271,20 +296,66 @@ async function addCredentialFlow() {
 }
 
 async function listCredentialsFlow() {
-  const entries = loadEntries();
-  if (!entries.length) {
+  const allEntries = loadEntries();
+  if (!allEntries.length) {
     p.log.warn(chalk.yellow('Belum ada credential tersimpan.'));
     return;
   }
 
+  const users = loadUsers();
+  let entries = allEntries;
+
+  if (users.length) {
+    const filterChoice = checkCancel(
+      await p.select({
+        message: 'Filter by user',
+        options: [
+          { value: '__all__', label: chalk.dim('Semua User') },
+          ...users.map((u) => ({ value: u.id, label: u.name })),
+        ],
+      }),
+    ) as string;
+    if (filterChoice !== '__all__') {
+      entries = allEntries.filter((e) => e.cred_user_id === filterChoice);
+    }
+  }
+
+  if (!entries.length) {
+    p.log.warn(chalk.yellow('Tidak ada credential untuk user ini.'));
+    return;
+  }
+
   console.log();
-  console.log(entriesTable(entries));
+  console.log(entriesTable(entries, users));
 }
 
 async function viewCredentialFlow() {
-  const entries = loadEntries();
-  if (!entries.length) {
+  const allEntries = loadEntries();
+  if (!allEntries.length) {
     p.log.warn(chalk.yellow('Belum ada credential tersimpan.'));
+    return;
+  }
+
+  const users = loadUsers();
+  let entries = allEntries;
+
+  if (users.length) {
+    const filterChoice = checkCancel(
+      await p.select({
+        message: 'Filter by user',
+        options: [
+          { value: '__all__', label: chalk.dim('Semua User') },
+          ...users.map((u) => ({ value: u.id, label: u.name })),
+        ],
+      }),
+    ) as string;
+    if (filterChoice !== '__all__') {
+      entries = allEntries.filter((e) => e.cred_user_id === filterChoice);
+    }
+  }
+
+  if (!entries.length) {
+    p.log.warn(chalk.yellow('Tidak ada credential untuk user ini.'));
     return;
   }
 
@@ -402,6 +473,21 @@ async function confirmAndDeleteEntry(entry: PasswordEntry) {
 async function editEntryFlow(entry: PasswordEntry) {
   const publicKey = readPublicKey();
 
+  const users = loadUsers();
+  let cred_user_id = entry.cred_user_id;
+  if (users.length) {
+    const userChoice = checkCancel(
+      await p.select({
+        message: 'User yang dikaitkan',
+        options: [
+          { value: '__none__', label: chalk.dim('— Tanpa User —') },
+          ...users.map((u) => ({ value: u.id, label: u.name })),
+        ],
+      }),
+    ) as string;
+    cred_user_id = userChoice === '__none__' ? null : userChoice;
+  }
+
   if (entry.type === 'ssh_key') {
     const source = checkCancel(
       await p.text({
@@ -456,6 +542,7 @@ async function editEntryFlow(entry: PasswordEntry) {
       ...entry,
       source,
       description: description || '',
+      cred_user_id,
       encrypted_private_key,
       public_key,
     });
@@ -511,6 +598,7 @@ async function editEntryFlow(entry: PasswordEntry) {
       port: Number(portInput || entry.port),
       username,
       description: description || '',
+      cred_user_id,
       encrypted_password,
     });
     p.log.success(
@@ -578,12 +666,104 @@ async function editEntryFlow(entry: PasswordEntry) {
     source,
     username,
     description: description || '',
+    cred_user_id,
     encrypted_password,
     extra,
   });
   p.log.success(
     chalk.green(`✔ Credential '${chalk.bold(source)}' berhasil diperbarui.`),
   );
+}
+
+async function manageUsersFlow() {
+  while (true) {
+    printBanner();
+    const users = loadUsers();
+
+    if (users.length) {
+      console.log();
+      const lines = users.map(
+        (u, i) =>
+          `  ${chalk.dim(`${i + 1}.`)} ${chalk.whiteBright(u.name)}  ${chalk.dim(u.id)}`,
+      );
+      console.log(chalk.bold.cyan('👤 Daftar Users:'));
+      console.log(lines.join('\n'));
+      console.log();
+    } else {
+      console.log(chalk.dim('\n  Belum ada user terdaftar.\n'));
+    }
+
+    const action = checkCancel(
+      await p.select({
+        message: 'Manage Users',
+        options: [
+          { value: 'add', label: `${chalk.green('+')} Tambah User` },
+          { value: 'edit', label: `${chalk.yellow('✏️ ')} Edit User` },
+          { value: 'delete', label: `${chalk.red('🗑 ')} Hapus User` },
+          { value: 'back', label: chalk.dim('← Kembali') },
+        ],
+      }),
+    );
+
+    if (action === 'back') return;
+
+    if (action === 'add') {
+      const name = checkCancel(
+        await p.text({ message: 'Nama user', placeholder: 'misal: John Doe' }),
+      );
+      addUser({ id: newId(), name });
+      p.log.success(
+        chalk.green(`✔ User '${chalk.bold(name)}' berhasil ditambahkan.`),
+      );
+    } else if (action === 'edit') {
+      if (!users.length) {
+        p.log.warn(chalk.yellow('Belum ada user.'));
+      } else {
+        const selectedId = checkCancel(
+          await p.select({
+            message: 'Pilih user untuk diedit',
+            options: users.map((u) => ({ value: u.id, label: u.name })),
+          }),
+        ) as string;
+        const user = users.find((u) => u.id === selectedId)!;
+        const name = checkCancel(
+          await p.text({ message: 'Nama baru', initialValue: user.name }),
+        );
+        updateUser({ ...user, name });
+        p.log.success(
+          chalk.green(`✔ User '${chalk.bold(name)}' berhasil diperbarui.`),
+        );
+      }
+    } else if (action === 'delete') {
+      if (!users.length) {
+        p.log.warn(chalk.yellow('Belum ada user.'));
+      } else {
+        const selectedId = checkCancel(
+          await p.select({
+            message: 'Pilih user untuk dihapus',
+            options: users.map((u) => ({ value: u.id, label: u.name })),
+          }),
+        ) as string;
+        const user = users.find((u) => u.id === selectedId)!;
+        const confirmed = checkCancel(
+          await p.confirm({
+            message: `Hapus user '${chalk.bold(user.name)}'? Credential yang dikaitkan tidak ikut terhapus.`,
+            initialValue: false,
+          }),
+        );
+        if (confirmed) {
+          deleteUser(user.id);
+          p.log.success(
+            chalk.green(`✔ User '${chalk.bold(user.name)}' berhasil dihapus.`),
+          );
+        } else {
+          p.log.info(chalk.dim('Dibatalkan.'));
+        }
+      }
+    }
+
+    await p.text({ message: pressEnterHint(), defaultValue: '' });
+  }
 }
 
 async function generatePasswordFlow() {
