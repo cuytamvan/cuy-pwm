@@ -53,12 +53,10 @@ export function printBanner() {
   console.log();
   console.log(logo);
   console.log(
-    chalk.dim(
-      '              🔐 CLI Password Manager  •  powered by Bun & OpenSSL',
-    ),
+    chalk.dim('    🔐 CLI Password Manager  •  powered by Bun & OpenSSL'),
   );
   console.log(
-    chalk.dim('            ────────────────────────────────────────────────'),
+    chalk.dim('  ────────────────────────────────────────────────────────'),
   );
   console.log();
 }
