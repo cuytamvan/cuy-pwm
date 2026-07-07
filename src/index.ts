@@ -11,8 +11,16 @@ import {
 import { encryptData, decryptData } from './crypto';
 import { loadEntries, addEntry, deleteEntry, newId } from './store';
 import { promptGeneratePassword } from './generator';
+import {
+  printBanner,
+  entryLabel,
+  credentialTypeOptions,
+  detailBox,
+  passwordBox,
+  dangerBox,
+  pressEnterHint,
+} from './ui';
 import type {
-  PasswordEntry,
   SimpleCredentialEntry,
   SshCredEntry,
   SshKeyEntry,
@@ -21,7 +29,7 @@ import type {
 
 function checkCancel<T>(value: T | symbol): T {
   if (p.isCancel(value)) {
-    p.cancel('Dibatalkan.');
+    p.cancel(chalk.red('Dibatalkan.'));
     process.exit(0);
   }
   return value as T;
@@ -34,14 +42,8 @@ function resolvePath(path: string): string {
   return path;
 }
 
-function printBanner() {
-  console.clear();
-  p.intro(chalk.bgCyan.black(' 🔐 cuy-pwm — CLI Password Manager '));
-}
-
 async function main() {
   printBanner();
-
   await ensureKeys();
 
   while (true) {
@@ -51,17 +53,20 @@ async function main() {
       await p.select({
         message: 'Mau ngapain nih?',
         options: [
-          { value: 'add', label: '➕ Tambah Credential' },
-          { value: 'view', label: '👁  Lihat Credential' },
-          { value: 'generate', label: '🎲 Generate Password' },
-          { value: 'delete', label: '🗑  Hapus Credential' },
-          { value: 'exit', label: '🚪 Keluar' },
+          { value: 'add', label: `${chalk.green('➕')} Tambah Credential` },
+          { value: 'view', label: `${chalk.cyan('👁 ')} Lihat Credential` },
+          {
+            value: 'generate',
+            label: `${chalk.yellow('🎲')} Generate Password`,
+          },
+          { value: 'delete', label: `${chalk.red('🗑 ')} Hapus Credential` },
+          { value: 'exit', label: `${chalk.dim('🚪')} Keluar` },
         ],
       }),
     );
 
     if (action === 'exit') {
-      p.outro(chalk.green('Sampai jumpa 👋'));
+      p.outro(chalk.greenBright.bold('Sampai jumpa 👋'));
       break;
     }
 
@@ -74,11 +79,7 @@ async function main() {
       p.log.error(chalk.red(String(err instanceof Error ? err.message : err)));
     }
 
-    // biar user sempat baca hasil sebelum layar di-clear lagi di iterasi berikutnya
-    await p.text({
-      message: chalk.dim('Tekan Enter untuk kembali ke menu...'),
-      defaultValue: '',
-    });
+    await p.text({ message: pressEnterHint(), defaultValue: '' });
   }
 }
 
@@ -87,8 +88,8 @@ async function passwordOrGenerate(): Promise<string> {
     await p.select({
       message: 'Password diisi bagaimana?',
       options: [
-        { value: 'manual', label: 'Input manual' },
-        { value: 'generate', label: 'Generate password' },
+        { value: 'manual', label: `${chalk.blue('⌨️ ')}  Input manual` },
+        { value: 'generate', label: `${chalk.yellow('🎲')} Generate password` },
       ],
     }),
   );
@@ -96,10 +97,10 @@ async function passwordOrGenerate(): Promise<string> {
   if (choice === 'generate') {
     const generated = await promptGeneratePassword();
     if (!generated) {
-      p.log.warn('Generate dibatalkan, lanjut input manual.');
+      p.log.warn(chalk.yellow('Generate dibatalkan, lanjut input manual.'));
       return checkCancel(await p.password({ message: 'Password' }));
     }
-    p.note(chalk.yellow(generated), 'Password ter-generate');
+    console.log(passwordBox(generated, '🎲 Password ter-generate'));
     return generated;
   }
 
@@ -110,15 +111,7 @@ async function addCredentialFlow() {
   const type = checkCancel(
     await p.select({
       message: 'Pilih tipe credential',
-      options: [
-        { value: 'github', label: 'GitHub' },
-        { value: 'gitlab', label: 'GitLab' },
-        { value: 'gmail', label: 'Gmail' },
-        { value: 'bank', label: 'Akun Bank' },
-        { value: 'website', label: 'Akun Website' },
-        { value: 'ssh_cred', label: 'SSH Credential (host/port/user/pass)' },
-        { value: 'ssh_key', label: 'SSH Key (private + public key)' },
-      ],
+      options: credentialTypeOptions(),
     }),
   ) as CredentialType;
 
@@ -171,7 +164,9 @@ async function addCredentialFlow() {
     };
 
     addEntry(entry);
-    p.log.success(chalk.green(`SSH Key '${source}' berhasil disimpan.`));
+    p.log.success(
+      chalk.green(`✔ SSH Key '${chalk.bold(source)}' berhasil disimpan.`),
+    );
     return;
   }
 
@@ -214,7 +209,11 @@ async function addCredentialFlow() {
     };
 
     addEntry(entry);
-    p.log.success(chalk.green(`SSH Credential '${source}' berhasil disimpan.`));
+    p.log.success(
+      chalk.green(
+        `✔ SSH Credential '${chalk.bold(source)}' berhasil disimpan.`,
+      ),
+    );
     return;
   }
 
@@ -261,17 +260,15 @@ async function addCredentialFlow() {
   };
 
   addEntry(entry);
-  p.log.success(chalk.green(`Credential '${source}' berhasil disimpan.`));
-}
-
-function entryLabel(e: PasswordEntry): string {
-  return `[${e.type}] ${e.source}${e.description ? ' - ' + e.description : ''}`;
+  p.log.success(
+    chalk.green(`✔ Credential '${chalk.bold(source)}' berhasil disimpan.`),
+  );
 }
 
 async function viewCredentialFlow() {
   const entries = loadEntries();
   if (!entries.length) {
-    p.log.warn('Belum ada credential tersimpan.');
+    p.log.warn(chalk.yellow('Belum ada credential tersimpan.'));
     return;
   }
 
@@ -287,12 +284,10 @@ async function viewCredentialFlow() {
   const passphrase = await getPrivateKeyPassphraseIfNeeded();
 
   const s = p.spinner();
-  s.start('Decrypting...');
+  s.start('🔐 Decrypting data...');
 
   try {
-    let output = `${chalk.bold('Source     :')} ${entry.source}\n`;
-    output += `${chalk.bold('Tipe       :')} ${entry.type}\n`;
-    output += `${chalk.bold('Deskripsi  :')} ${entry.description || '-'}\n`;
+    let body = `${chalk.dim('Deskripsi')} : ${entry.description || '-'}\n`;
 
     if (entry.type === 'ssh_key') {
       const decryptedPrivate = decryptData(
@@ -300,37 +295,39 @@ async function viewCredentialFlow() {
         passphrase,
         entry.encrypted_private_key,
       );
-      output += `\n${chalk.bold('Public Key:')}\n${entry.public_key.trim()}\n`;
-      output += `\n${chalk.bold('Private Key:')}\n${chalk.magenta(decryptedPrivate.trim())}\n`;
+      body += `\n${chalk.bold.cyan('Public Key')}\n${chalk.gray(entry.public_key.trim())}\n`;
+      body += `\n${chalk.bold.cyan('Private Key')}\n${chalk.magentaBright(
+        decryptedPrivate.trim(),
+      )}\n`;
     } else if (entry.type === 'ssh_cred') {
       const decryptedPassword = decryptData(
         privateKeyPem,
         passphrase,
         entry.encrypted_password,
       );
-      output += `${chalk.bold('Host       :')} ${entry.host}\n`;
-      output += `${chalk.bold('Port       :')} ${entry.port}\n`;
-      output += `${chalk.bold('Username   :')} ${entry.username}\n`;
-      output += `${chalk.bold('Password   :')} ${chalk.magenta(decryptedPassword)}\n`;
+      body += `${chalk.dim('Host')}     : ${chalk.whiteBright(entry.host)}\n`;
+      body += `${chalk.dim('Port')}     : ${chalk.whiteBright(String(entry.port))}\n`;
+      body += `${chalk.dim('Username')} : ${chalk.whiteBright(entry.username)}\n`;
+      body += `${chalk.dim('Password')} : ${chalk.magentaBright.bold(decryptedPassword)}\n`;
     } else {
       const decryptedPassword = decryptData(
         privateKeyPem,
         passphrase,
         entry.encrypted_password,
       );
-      output += `${chalk.bold('Username   :')} ${entry.username}\n`;
-      output += `${chalk.bold('Password   :')} ${chalk.magenta(decryptedPassword)}\n`;
+      body += `${chalk.dim('Username')} : ${chalk.whiteBright(entry.username)}\n`;
+      body += `${chalk.dim('Password')} : ${chalk.magentaBright.bold(decryptedPassword)}\n`;
       if (entry.extra) {
         for (const [k, v] of Object.entries(entry.extra)) {
-          output += `${chalk.bold(k + '     :')} ${v}\n`;
+          body += `${chalk.dim(k)} : ${chalk.whiteBright(v)}\n`;
         }
       }
     }
 
-    s.stop('Berhasil decrypt.');
-    p.note(output.trim(), 'Detail Credential');
+    s.stop(chalk.green('✔ Berhasil decrypt.'));
+    console.log(detailBox(entry, body.trim()));
   } catch (err) {
-    s.stop('Gagal decrypt.');
+    s.stop(chalk.red('✖ Gagal decrypt.'));
     throw new Error(
       'Gagal decrypt data. Pastikan passphrase private key benar. Detail: ' +
         String(err),
@@ -341,7 +338,7 @@ async function viewCredentialFlow() {
 async function deleteCredentialFlow() {
   const entries = loadEntries();
   if (!entries.length) {
-    p.log.warn('Belum ada credential tersimpan.');
+    p.log.warn(chalk.yellow('Belum ada credential tersimpan.'));
     return;
   }
 
@@ -354,29 +351,38 @@ async function deleteCredentialFlow() {
 
   const entry = entries.find((e) => e.id === selected)!;
 
+  console.log(
+    dangerBox(
+      '⚠️  Konfirmasi Hapus',
+      `${entryLabel(entry)}\n${chalk.dim('Aksi ini tidak bisa dibatalkan.')}`,
+    ),
+  );
+
   const confirmed = checkCancel(
     await p.confirm({
-      message: `Yakin ingin menghapus '${entry.source}'? Aksi ini tidak bisa dibatalkan.`,
+      message: `Yakin ingin menghapus '${entry.source}'?`,
       initialValue: false,
     }),
   );
 
   if (!confirmed) {
-    p.log.info('Dibatalkan.');
+    p.log.info(chalk.dim('Dibatalkan.'));
     return;
   }
 
   deleteEntry(entry.id);
-  p.log.success(chalk.green(`Credential '${entry.source}' berhasil dihapus.`));
+  p.log.success(
+    chalk.green(`✔ Credential '${chalk.bold(entry.source)}' berhasil dihapus.`),
+  );
 }
 
 async function generatePasswordFlow() {
   const generated = await promptGeneratePassword();
   if (!generated) {
-    p.log.warn('Generate password dibatalkan.');
+    p.log.warn(chalk.yellow('Generate password dibatalkan.'));
     return;
   }
-  p.note(chalk.magenta.bold(generated), 'Password hasil generate');
+  console.log(passwordBox(generated));
 }
 
 main().catch((err) => {
