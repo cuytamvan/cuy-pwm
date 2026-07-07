@@ -73,14 +73,16 @@ function matchEntry(entry: PasswordEntry, query: string): boolean {
   return false;
 }
 
-async function cmdLs() {
+async function cmdLs(rest: string[]) {
+  const showIdFlag = rest.includes('--show-id');
+
   const entries = loadEntries();
   const users = loadUsers();
   if (!entries.length) {
     console.log(chalk.yellow('No credentials saved yet.'));
     return;
   }
-  console.log(entriesTable(entries, users));
+  console.log(entriesTable(entries, users, !!showIdFlag));
 }
 
 async function cmdGet(rest: string[]) {
@@ -229,7 +231,7 @@ export async function runCli(args: string[]): Promise<boolean> {
   }
 
   if (cmd === 'ls') {
-    await cmdLs();
+    await cmdLs(rest);
     return true;
   }
 

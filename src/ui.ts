@@ -157,12 +157,13 @@ function entryUsernameCol(e: PasswordEntry): string {
 export function entriesTable(
   entries: PasswordEntry[],
   users?: CredUser[],
+  showId: boolean = true,
 ): string {
   const userMap = new Map((users ?? []).map((u) => [u.id, u.name]));
   const showUser = users !== undefined;
 
   const head = [
-    chalk.bold.cyan('Id'),
+    ...(showId ? [chalk.bold.cyan('ID')] : []),
     chalk.bold.cyan('Type'),
     chalk.bold.cyan('Source'),
     chalk.bold.cyan('Username / Info'),
@@ -189,7 +190,7 @@ export function entriesTable(
     );
 
     const row = [
-      chalk.whiteBright(e.id),
+      ...(showId ? [chalk.whiteBright(e.id)] : []),
       typeCol,
       chalk.whiteBright(truncate(e.source, 24)),
       entryUsernameCol(e),
