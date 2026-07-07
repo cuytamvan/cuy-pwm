@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import boxen from 'boxen';
+import Table from 'cli-table3';
 import type { PasswordEntry, CredentialType } from './types';
 
 /* ------------------------------------------------------------------ */
@@ -34,12 +35,12 @@ function gradientText(text: string, fromHex: string, toHex: string): string {
 }
 
 const LOGO_LINES = [
-  ' ██████╗██╗   ██╗██╗   ██╗ ██████╗ ██╗    ██╗███╗   ███╗',
-  '██╔════╝██║   ██║╚██╗ ██╔╝ ██╔══██╗██║    ██║████╗ ████║',
-  '██║     ██║   ██║ ╚████╔╝  ██████╔╝██║ █╗ ██║██╔████╔██║',
-  '██║     ██║   ██║  ╚██╔╝   ██╔═══╝ ██║███╗██║██║╚██╔╝██║',
-  '╚██████╗╚██████╔╝   ██║    ██║     ╚███╔███╔╝██║ ╚═╝ ██║',
-  ' ╚═════╝ ╚═════╝    ╚═╝    ╚═╝      ╚══╝╚══╝ ╚═╝     ╚═╝',
+  ' ██████╗██╗   ██╗██╗   ██╗      ██████╗ ██╗    ██╗███╗   ███╗',
+  '██╔════╝██║   ██║╚██╗ ██╔╝      ██╔══██╗██║    ██║████╗ ████║',
+  '██║     ██║   ██║ ╚████╔╝ █████╗██████╔╝██║ █╗ ██║██╔████╔██║',
+  '██║     ██║   ██║  ╚██╔╝  ╚════╝██╔═══╝ ██║███╗██║██║╚██╔╝██║',
+  '╚██████╗╚██████╔╝   ██║         ██║     ╚███╔███╔╝██║ ╚═╝ ██║',
+  ' ╚═════╝ ╚═════╝    ╚═╝         ╚═╝      ╚══╝╚══╝ ╚═╝     ╚═╝',
 ];
 
 export function printBanner() {
@@ -153,4 +154,59 @@ export function successBox(title: string, body: string): string {
     borderStyle: 'round',
     borderColor: 'green',
   });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Table (cli-table3) buat lihat semua credential sekaligus           */
+/* ------------------------------------------------------------------ */
+
+function truncate(text: string, max: number): string {
+  if (!text) return chalk.dim('-');
+  return text.length > max ? text.slice(0, max - 1) + '…' : text;
+}
+
+function entryUsernameCol(e: PasswordEntry): string {
+  if (e.type === 'ssh_key') return chalk.dim('(key pair)');
+  if (e.type === 'ssh_cred')
+    return `${e.username}${chalk.dim('@' + e.host + ':' + e.port)}`;
+  return e.username;
+}
+
+export function entriesTable(entries: PasswordEntry[]): string {
+  const table = new Table({
+    head: [
+      chalk.bold.cyan('Tipe'),
+      chalk.bold.cyan('Source'),
+      chalk.bold.cyan('Username / Info'),
+      chalk.bold.cyan('Deskripsi'),
+      chalk.bold.cyan('Dibuat'),
+    ],
+    style: { head: [], border: ['dim'] },
+    wordWrap: true,
+  });
+
+  entries.forEach((e) => {
+    const meta = TYPE_META[e.type];
+    const typeCol = chalk.hex(meta.color).bold(`${meta.icon} ${meta.label}`);
+    const createdCol = chalk.dim(
+      new Date(e.createdAt).toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }),
+    );
+
+    table.push([
+      typeCol,
+      chalk.whiteBright(truncate(e.source, 24)),
+      entryUsernameCol(e),
+      truncate(e.description, 28),
+      createdCol,
+    ]);
+  });
+
+  const header = chalk.dim(
+    `📋 Total: ${entries.length} credential tersimpan\n`,
+  );
+  return header + table.toString();
 }

@@ -9,7 +9,13 @@ import {
   getPrivateKeyPassphraseIfNeeded,
 } from './keys';
 import { encryptData, decryptData } from './crypto';
-import { loadEntries, addEntry, deleteEntry, newId } from './store';
+import {
+  loadEntries,
+  addEntry,
+  deleteEntry,
+  updateEntry,
+  newId,
+} from './store';
 import { promptGeneratePassword } from './generator';
 import {
   printBanner,
@@ -19,12 +25,14 @@ import {
   passwordBox,
   dangerBox,
   pressEnterHint,
+  entriesTable,
 } from './ui';
 import type {
   SimpleCredentialEntry,
   SshCredEntry,
   SshKeyEntry,
   CredentialType,
+  PasswordEntry,
 } from './types';
 
 function checkCancel<T>(value: T | symbol): T {
@@ -53,14 +61,11 @@ async function main() {
       await p.select({
         message: 'Mau ngapain nih?',
         options: [
-          { value: 'add', label: `${chalk.green('➕')} Tambah Credential` },
-          { value: 'view', label: `${chalk.cyan('👁 ')} Lihat Credential` },
-          {
-            value: 'generate',
-            label: `${chalk.yellow('🎲')} Generate Password`,
-          },
-          { value: 'delete', label: `${chalk.red('🗑 ')} Hapus Credential` },
-          { value: 'exit', label: `${chalk.dim('🚪')} Keluar` },
+          { value: 'add', label: `Tambah Credential` },
+          { value: 'list', label: `List Semua Credential` },
+          { value: 'view', label: `Lihat Credential` },
+          { value: 'generate', label: `Generate Password` },
+          { value: 'exit', label: `Keluar` },
         ],
       }),
     );
@@ -72,9 +77,9 @@ async function main() {
 
     try {
       if (action === 'add') await addCredentialFlow();
+      else if (action === 'list') await listCredentialsFlow();
       else if (action === 'view') await viewCredentialFlow();
       else if (action === 'generate') await generatePasswordFlow();
-      else if (action === 'delete') await deleteCredentialFlow();
     } catch (err) {
       p.log.error(chalk.red(String(err instanceof Error ? err.message : err)));
     }
@@ -265,6 +270,17 @@ async function addCredentialFlow() {
   );
 }
 
+async function listCredentialsFlow() {
+  const entries = loadEntries();
+  if (!entries.length) {
+    p.log.warn(chalk.yellow('Belum ada credential tersimpan.'));
+    return;
+  }
+
+  console.log();
+  console.log(entriesTable(entries));
+}
+
 async function viewCredentialFlow() {
   const entries = loadEntries();
   if (!entries.length) {
@@ -274,12 +290,34 @@ async function viewCredentialFlow() {
 
   const selected = checkCancel(
     await p.select({
-      message: 'Pilih credential yang ingin dilihat',
+      message: 'Pilih credential',
       options: entries.map((e) => ({ value: e.id, label: entryLabel(e) })),
     }),
   );
 
   const entry = entries.find((e) => e.id === selected)!;
+
+  const subAction = checkCancel(
+    await p.select({
+      message: `Aksi untuk '${chalk.bold(entry.source)}'`,
+      options: [
+        { value: 'view', label: `${chalk.cyan('👁 ')}  Lihat Detail` },
+        { value: 'edit', label: `${chalk.yellow('✏️ ')}  Edit Credential` },
+        { value: 'delete', label: `${chalk.red('🗑 ')}  Hapus Credential` },
+      ],
+    }),
+  );
+
+  if (subAction === 'view') {
+    await showEntryDetail(entry);
+  } else if (subAction === 'edit') {
+    await editEntryFlow(entry);
+  } else if (subAction === 'delete') {
+    await confirmAndDeleteEntry(entry);
+  }
+}
+
+async function showEntryDetail(entry: PasswordEntry) {
   const privateKeyPem = readPrivateKeyPem();
   const passphrase = await getPrivateKeyPassphraseIfNeeded();
 
@@ -335,22 +373,7 @@ async function viewCredentialFlow() {
   }
 }
 
-async function deleteCredentialFlow() {
-  const entries = loadEntries();
-  if (!entries.length) {
-    p.log.warn(chalk.yellow('Belum ada credential tersimpan.'));
-    return;
-  }
-
-  const selected = checkCancel(
-    await p.select({
-      message: 'Pilih credential yang ingin dihapus',
-      options: entries.map((e) => ({ value: e.id, label: entryLabel(e) })),
-    }),
-  );
-
-  const entry = entries.find((e) => e.id === selected)!;
-
+async function confirmAndDeleteEntry(entry: PasswordEntry) {
   console.log(
     dangerBox(
       '⚠️  Konfirmasi Hapus',
@@ -373,6 +396,193 @@ async function deleteCredentialFlow() {
   deleteEntry(entry.id);
   p.log.success(
     chalk.green(`✔ Credential '${chalk.bold(entry.source)}' berhasil dihapus.`),
+  );
+}
+
+async function editEntryFlow(entry: PasswordEntry) {
+  const publicKey = readPublicKey();
+
+  if (entry.type === 'ssh_key') {
+    const source = checkCancel(
+      await p.text({
+        message: 'Nama/label (source)',
+        initialValue: entry.source,
+      }),
+    );
+    const description = checkCancel(
+      await p.text({
+        message: 'Deskripsi (opsional)',
+        initialValue: entry.description,
+        defaultValue: '',
+      }),
+    );
+
+    const changeKey = checkCancel(
+      await p.confirm({ message: 'Ganti file key?', initialValue: false }),
+    );
+
+    let encrypted_private_key = entry.encrypted_private_key;
+    let public_key = entry.public_key;
+
+    if (changeKey) {
+      const privateKeyPath = checkCancel(
+        await p.text({
+          message: 'Path file private key baru',
+          placeholder: '~/.ssh/id_rsa',
+          validate(v) {
+            if (!v) return 'Wajib diisi';
+            if (!existsSync(resolvePath(v))) return 'File tidak ditemukan';
+          },
+        }),
+      );
+      const publicKeyPath = checkCancel(
+        await p.text({
+          message: 'Path file public key baru',
+          placeholder: '~/.ssh/id_rsa.pub',
+          validate(v) {
+            if (!v) return 'Wajib diisi';
+            if (!existsSync(resolvePath(v))) return 'File tidak ditemukan';
+          },
+        }),
+      );
+      encrypted_private_key = encryptData(
+        publicKey,
+        readFileSync(resolvePath(privateKeyPath), 'utf8'),
+      );
+      public_key = readFileSync(resolvePath(publicKeyPath), 'utf8');
+    }
+
+    updateEntry({
+      ...entry,
+      source,
+      description: description || '',
+      encrypted_private_key,
+      public_key,
+    });
+    p.log.success(
+      chalk.green(`✔ SSH Key '${chalk.bold(source)}' berhasil diperbarui.`),
+    );
+    return;
+  }
+
+  if (entry.type === 'ssh_cred') {
+    const source = checkCancel(
+      await p.text({
+        message: 'Nama/label (source)',
+        initialValue: entry.source,
+      }),
+    );
+    const host = checkCancel(
+      await p.text({ message: 'Host', initialValue: entry.host }),
+    );
+    const portInput = checkCancel(
+      await p.text({
+        message: 'Port',
+        initialValue: String(entry.port),
+        validate(v) {
+          if (v && Number.isNaN(Number(v))) return 'Port harus angka';
+        },
+      }),
+    );
+    const username = checkCancel(
+      await p.text({ message: 'Username', initialValue: entry.username }),
+    );
+    const description = checkCancel(
+      await p.text({
+        message: 'Deskripsi (opsional)',
+        initialValue: entry.description,
+        defaultValue: '',
+      }),
+    );
+
+    const changePassword = checkCancel(
+      await p.confirm({ message: 'Ganti password?', initialValue: false }),
+    );
+    let encrypted_password = entry.encrypted_password;
+    if (changePassword) {
+      const newPw = await passwordOrGenerate();
+      encrypted_password = encryptData(publicKey, newPw);
+    }
+
+    updateEntry({
+      ...entry,
+      source,
+      host,
+      port: Number(portInput || entry.port),
+      username,
+      description: description || '',
+      encrypted_password,
+    });
+    p.log.success(
+      chalk.green(
+        `✔ SSH Credential '${chalk.bold(source)}' berhasil diperbarui.`,
+      ),
+    );
+    return;
+  }
+
+  // github, gitlab, gmail, bank, website
+  const source = checkCancel(
+    await p.text({ message: 'Source / Nama', initialValue: entry.source }),
+  );
+  const username = checkCancel(
+    await p.text({
+      message: 'Username / Email / No. Rekening',
+      initialValue: entry.username,
+    }),
+  );
+  const description = checkCancel(
+    await p.text({
+      message: 'Deskripsi (opsional)',
+      initialValue: entry.description,
+      defaultValue: '',
+    }),
+  );
+
+  const changePassword = checkCancel(
+    await p.confirm({ message: 'Ganti password?', initialValue: false }),
+  );
+  let encrypted_password = entry.encrypted_password;
+  if (changePassword) {
+    const newPw = await passwordOrGenerate();
+    encrypted_password = encryptData(publicKey, newPw);
+  }
+
+  let extra = entry.extra;
+
+  if (entry.type === 'bank') {
+    const accountNumber = checkCancel(
+      await p.text({
+        message: 'Nomor rekening (opsional)',
+        initialValue: entry.extra?.account_number || '',
+        defaultValue: '',
+      }),
+    );
+    if (accountNumber)
+      extra = { ...(extra || {}), account_number: accountNumber };
+  }
+
+  if (entry.type === 'website') {
+    const url = checkCancel(
+      await p.text({
+        message: 'URL website (opsional)',
+        initialValue: entry.extra?.url || '',
+        defaultValue: '',
+      }),
+    );
+    if (url) extra = { ...(extra || {}), url };
+  }
+
+  updateEntry({
+    ...entry,
+    source,
+    username,
+    description: description || '',
+    encrypted_password,
+    extra,
+  });
+  p.log.success(
+    chalk.green(`✔ Credential '${chalk.bold(source)}' berhasil diperbarui.`),
   );
 }
 

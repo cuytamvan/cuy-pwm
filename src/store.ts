@@ -29,6 +29,11 @@ export function deleteEntry(id: string) {
   saveEntries(entries);
 }
 
+export function updateEntry(updated: PasswordEntry) {
+  const entries = loadEntries().map((e) => (e.id === updated.id ? updated : e));
+  saveEntries(entries);
+}
+
 export function newId(): string {
   return randomUUID();
 }
