@@ -86,9 +86,14 @@ async function cmdLs() {
 async function cmdGet(rest: string[]) {
   const idArg = rest.find((a) => !a.startsWith('-'));
   const copyFlag = rest.includes('--copy-password');
+  const showPrivateKeyFlag = rest.includes('--show-private-key');
 
   if (!idArg) {
-    console.error(chalk.red('Usage: cuypwm get <cred_id> [--copy-password]'));
+    console.error(
+      chalk.red(
+        'Usage: cuypwm get <cred_id> [--copy-password] [--show-private-key]',
+      ),
+    );
     process.exit(1);
   }
 
@@ -121,11 +126,17 @@ async function cmdGet(rest: string[]) {
 
   if (entry.type === 'ssh_key') {
     console.log(
-      `  ${chalk.dim('Public Key')}  :\n${chalk.gray(entry.public_key.trim())}`,
+      `  ${chalk.dim('Public Key')}  :\n${chalk.white(entry.public_key.trim())}`,
     );
     if (copyFlag) {
       console.log(
         chalk.yellow('\n  --copy-password is not applicable for SSH Keys.'),
+      );
+    }
+    if (showPrivateKeyFlag) {
+      const privateKey = await decryptEntry(entry.encrypted_private_key);
+      console.log(
+        `  ${chalk.dim('Private Key')} :\n${chalk.white(privateKey.trim())}`,
       );
     }
   } else if (entry.type === 'ssh_cred') {
