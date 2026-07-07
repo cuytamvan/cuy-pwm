@@ -51,6 +51,7 @@ export function printBanner() {
   console.log(
     chalk.dim('    🔐 CLI Password Manager  •  powered by Bun & OpenSSL'),
   );
+  console.log(chalk.dim('               copyright by cuytamvan 2026'));
   console.log(
     chalk.dim('  ────────────────────────────────────────────────────────'),
   );

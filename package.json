@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "bun run src/index.ts",
+    "dev": "bun run src/index.ts --watch",
     "build": "bun build ./src/index.ts --compile --outfile cuypwm",
     "pretty": "prettier --write src/**/*.ts"
   },
