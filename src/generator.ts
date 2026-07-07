@@ -9,14 +9,10 @@ const CHARSETS = {
 
 type CharsetKey = keyof typeof CHARSETS;
 
-/**
- * Alur interaktif: checklist opsi karakter -> input panjang password
- * (default 8) -> generate. Return undefined kalau user cancel/invalid.
- */
 export async function promptGeneratePassword(): Promise<string | undefined> {
   const options = await p.multiselect({
     message:
-      'Pilih jenis karakter untuk password (spasi untuk pilih, enter untuk lanjut)',
+      'Select character types for password (space to select, enter to continue)',
     options: [
       { value: 'upper', label: 'UPPERCASE (A-Z)' },
       { value: 'lower', label: 'lowercase (a-z)' },
@@ -31,21 +27,21 @@ export async function promptGeneratePassword(): Promise<string | undefined> {
   const selected = options as CharsetKey[];
 
   if (!selected.length) {
-    p.log.error('Minimal pilih 1 jenis karakter.');
+    p.log.error('Select at least 1 character type.');
     return undefined;
   }
 
   const lengthInput = await p.text({
-    message: 'Panjang password',
+    message: 'Password length',
     placeholder: '8',
     initialValue: '8',
     validate(value) {
       if (!value) return;
       const n = Number(value);
       if (Number.isNaN(n) || !Number.isInteger(n))
-        return 'Harus berupa angka bulat';
-      if (n < 4) return 'Panjang minimal 4 karakter';
-      if (n > 128) return 'Panjang maksimal 128 karakter';
+        return 'Must be a whole number';
+      if (n < 4) return 'Minimum length is 4 characters';
+      if (n > 128) return 'Maximum length is 128 characters';
     },
   });
 
@@ -65,7 +61,6 @@ export function generatePassword(
 
   const result: string[] = [];
 
-  // pastikan minimal 1 karakter dari tiap pool yang dipilih
   for (const pool of pools) {
     result.push(pool[randomInt(pool.length)]!);
   }
@@ -74,7 +69,6 @@ export function generatePassword(
     result.push(allChars[randomInt(allChars.length)]!);
   }
 
-  // fisher-yates shuffle
   for (let i = result.length - 1; i > 0; i--) {
     const j = randomInt(i + 1);
     const current = result[i]!;

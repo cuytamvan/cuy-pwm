@@ -3,10 +3,6 @@ import boxen from 'boxen';
 import Table from 'cli-table3';
 import type { PasswordEntry, CredentialType, CredUser } from './types';
 
-/* ------------------------------------------------------------------ */
-/*  Gradient text util (dipakai buat banner ASCII biar nggak flat)     */
-/* ------------------------------------------------------------------ */
-
 function hexToRgb(hex: string): [number, number, number] {
   const clean = hex.replace('#', '');
   const num = parseInt(clean, 16);
@@ -68,12 +64,8 @@ export function divider() {
 }
 
 export function pressEnterHint() {
-  return chalk.dim.italic('Tekan Enter untuk kembali ke menu...');
+  return chalk.dim.italic('Press Enter to return to the menu...');
 }
-
-/* ------------------------------------------------------------------ */
-/*  Metadata & styling per tipe credential                             */
-/* ------------------------------------------------------------------ */
 
 export const TYPE_META: Record<
   CredentialType,
@@ -82,7 +74,7 @@ export const TYPE_META: Record<
   github: { icon: '🐙', label: 'GitHub', color: '#e6edf3' },
   gitlab: { icon: '🦊', label: 'GitLab', color: '#fc6d26' },
   gmail: { icon: '✉️ ', label: 'Gmail', color: '#ea4335' },
-  bank: { icon: '🏦', label: 'Akun Bank', color: '#facc15' },
+  bank: { icon: '🏦', label: 'Bank Account', color: '#facc15' },
   website: { icon: '🌐', label: 'Website', color: '#38bdf8' },
   ssh_cred: { icon: '🖥️ ', label: 'SSH Credential', color: '#34d399' },
   ssh_key: { icon: '🔑', label: 'SSH Key', color: '#a78bfa' },
@@ -104,10 +96,6 @@ export function credentialTypeOptions() {
     label: typeBadge(type),
   }));
 }
-
-/* ------------------------------------------------------------------ */
-/*  Boxes                                                               */
-/* ------------------------------------------------------------------ */
 
 export function detailBox(entry: PasswordEntry, body: string): string {
   const meta = TYPE_META[entry.type];
@@ -154,10 +142,6 @@ export function successBox(title: string, body: string): string {
   });
 }
 
-/* ------------------------------------------------------------------ */
-/*  Table (cli-table3) buat lihat semua credential sekaligus           */
-/* ------------------------------------------------------------------ */
-
 function truncate(text: string, max: number): string {
   if (!text) return chalk.dim('-');
   return text.length > max ? text.slice(0, max - 1) + '…' : text;
@@ -178,11 +162,12 @@ export function entriesTable(
   const showUser = users !== undefined;
 
   const head = [
-    chalk.bold.cyan('Tipe'),
+    chalk.bold.cyan('Id'),
+    chalk.bold.cyan('Type'),
     chalk.bold.cyan('Source'),
     chalk.bold.cyan('Username / Info'),
-    chalk.bold.cyan('Deskripsi'),
-    chalk.bold.cyan('Dibuat'),
+    chalk.bold.cyan('Description'),
+    chalk.bold.cyan('Created'),
   ];
   if (showUser) head.push(chalk.bold.cyan('User'));
 
@@ -204,6 +189,7 @@ export function entriesTable(
     );
 
     const row = [
+      chalk.whiteBright(e.id),
       typeCol,
       chalk.whiteBright(truncate(e.source, 24)),
       entryUsernameCol(e),
@@ -219,8 +205,6 @@ export function entriesTable(
     table.push(row);
   });
 
-  const header = chalk.dim(
-    `📋 Total: ${entries.length} credential tersimpan\n`,
-  );
+  const header = chalk.dim(`📋 Total: ${entries.length} credential(s) saved\n`);
   return header + table.toString();
 }

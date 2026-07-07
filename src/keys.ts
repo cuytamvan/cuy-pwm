@@ -26,11 +26,6 @@ export function saveConfig(cfg: AppConfig) {
   writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
 }
 
-/**
- * Menjalankan perintah `openssl` lewat Bun.spawn.
- * Passphrase (kalau ada) dikirim lewat environment variable (bukan argumen
- * command line) supaya tidak nampak di `ps aux`.
- */
 async function runOpenssl(args: string[], env?: Record<string, string>) {
   const proc = Bun.spawn(['openssl', ...args], {
     stdout: 'pipe',
@@ -50,39 +45,37 @@ export async function generateKeysFlow() {
   ensureAppDir();
 
   p.log.warn(
-    chalk.yellow(
-      'Key pair belum ditemukan di ~/.cuy-pwm/keys. Kita generate dulu ya.',
-    ),
+    chalk.yellow('Key pair not found at ~/.cuy-pwm/keys. Generating one now.'),
   );
 
   const useProtect = await p.confirm({
-    message: 'Proteksi private key pakai passphrase?',
+    message: 'Protect private key with a passphrase?',
     initialValue: true,
   });
 
   if (p.isCancel(useProtect)) {
-    p.cancel('Dibatalkan.');
+    p.cancel('Cancelled.');
     process.exit(0);
   }
 
   let passphrase: string | undefined;
 
   if (useProtect) {
-    const pass1 = await p.password({ message: 'Masukkan passphrase' });
+    const pass1 = await p.password({ message: 'Enter passphrase' });
     if (p.isCancel(pass1)) {
-      p.cancel('Dibatalkan.');
+      p.cancel('Cancelled.');
       process.exit(0);
     }
 
-    const pass2 = await p.password({ message: 'Konfirmasi passphrase' });
+    const pass2 = await p.password({ message: 'Confirm passphrase' });
     if (p.isCancel(pass2)) {
-      p.cancel('Dibatalkan.');
+      p.cancel('Cancelled.');
       process.exit(0);
     }
 
     if (pass1 !== pass2) {
       p.log.error(
-        chalk.red('Passphrase tidak sama. Silakan jalankan ulang aplikasinya.'),
+        chalk.red('Passphrases do not match. Please restart the application.'),
       );
       process.exit(1);
     }
@@ -135,11 +128,11 @@ export async function generateKeysFlow() {
 
     saveConfig({ protected: !!passphrase });
 
-    s.stop('RSA key pair berhasil dibuat.');
+    s.stop('RSA key pair generated successfully.');
     p.log.success(chalk.green(`Private key: ${PRIVATE_KEY_PATH}`));
     p.log.success(chalk.green(`Public key : ${PUBLIC_KEY_PATH}`));
   } catch (err) {
-    s.stop('Gagal generate key.');
+    s.stop('Failed to generate key.');
     p.log.error(chalk.red(String(err)));
     process.exit(1);
   }
@@ -165,9 +158,9 @@ export async function getPrivateKeyPassphraseIfNeeded(): Promise<
   const cfg = loadConfig();
   if (!cfg.protected) return undefined;
 
-  const pass = await p.password({ message: 'Masukkan passphrase private key' });
+  const pass = await p.password({ message: 'Enter private key passphrase' });
   if (p.isCancel(pass)) {
-    p.cancel('Dibatalkan.');
+    p.cancel('Cancelled.');
     process.exit(0);
   }
   return pass;

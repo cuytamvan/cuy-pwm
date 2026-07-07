@@ -15,10 +15,6 @@ export interface BaseEntry {
   cred_user_id: string | null;
 }
 
-/**
- * Dipakai untuk: github, gitlab, gmail, bank, website
- * `extra` dipakai untuk field tambahan spesifik tipe (mis. account_number, url)
- */
 export interface SimpleCredentialEntry extends BaseEntry {
   type: 'github' | 'gitlab' | 'gmail' | 'website' | 'bank';
   username: string;
@@ -26,7 +22,6 @@ export interface SimpleCredentialEntry extends BaseEntry {
   extra?: Record<string, string>;
 }
 
-/** SSH credential (host, port, username, password) */
 export interface SshCredEntry extends BaseEntry {
   type: 'ssh_cred';
   username: string;
@@ -35,7 +30,6 @@ export interface SshCredEntry extends BaseEntry {
   port: number;
 }
 
-/** SSH key pair (private key dienkripsi, public key disimpan apa adanya) */
 export interface SshKeyEntry extends BaseEntry {
   type: 'ssh_key';
   encrypted_private_key: string;
@@ -45,6 +39,5 @@ export interface SshKeyEntry extends BaseEntry {
 export type PasswordEntry = SimpleCredentialEntry | SshCredEntry | SshKeyEntry;
 
 export interface AppConfig {
-  /** apakah private key diproteksi dengan passphrase */
   protected: boolean;
 }

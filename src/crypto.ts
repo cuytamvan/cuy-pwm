@@ -7,17 +7,11 @@ import {
   constants,
 } from 'node:crypto';
 
-/**
- * RSA punya batas ukuran plaintext yang bisa dienkripsi langsung, jadi di sini
- * dipakai skema hybrid: data asli dienkripsi pakai AES-256-GCM (bisa untuk
- * data sepanjang apa pun, termasuk SSH private key), lalu AES key-nya
- * dienkripsi pakai RSA public key. Hasilnya digabung jadi satu string base64.
- */
 interface EncryptedPayload {
-  k: string; // encrypted AES key (base64)
-  iv: string; // AES-GCM IV (base64)
-  tag: string; // AES-GCM auth tag (base64)
-  data: string; // ciphertext (base64)
+  k: string;
+  iv: string;
+  tag: string;
+  data: string;
 }
 
 export function encryptData(publicKeyPem: string, plaintext: string): string {

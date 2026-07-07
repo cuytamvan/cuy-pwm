@@ -23,8 +23,6 @@ function saveDb(db: DbStore) {
   writeFileSync(SOURCE_FILE, JSON.stringify(db, null, 2));
 }
 
-// --- Credential Entries ---
-
 export function loadEntries(): PasswordEntry[] {
   return loadDb().cred_entries;
 }
@@ -48,8 +46,6 @@ export function updateEntry(updated: PasswordEntry) {
   );
   saveDb(db);
 }
-
-// --- Cred Users ---
 
 export function loadUsers(): CredUser[] {
   return loadDb().cred_users;
