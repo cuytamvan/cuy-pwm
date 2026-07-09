@@ -1,15 +1,17 @@
 {
   "name": "cuypwm",
+  "version": "1.0.0",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
   "bin": {
-    "cuypwm": "src/index.ts"
+    "cuypwm": "dist/cuypwm.js"
   },
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run src/index.ts --watch",
-    "build": "bun build ./src/index.ts --compile --outfile cuypwm",
+    "build": "bun build ./src/index.ts --compile --outfile=./dist/cuypwm",
+    "build:node": "bun build ./src/index.ts --outfile=./dist/cuypwm.js --target=node",
     "pretty": "prettier --write src/**/*.ts"
   },
   "devDependencies": {
