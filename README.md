@@ -25,6 +25,12 @@ cd cuy-pwm
 bun install
 ```
 
+atau bisa juga install via npm:
+
+```bash
+npm install -g @cuytamvan/cuypwm
+```
+
 ## Menjalankan
 
 ```bash
@@ -59,7 +65,8 @@ tipe credential:
 ```typescript
 interface BaseEntry {
   id: string;
-  type: "github" | "gitlab" | "gmail" | "bank" | "website" | "ssh_cred" | "ssh_key";
+  type:
+    'github' | 'gitlab' | 'gmail' | 'bank' | 'website' | 'ssh_cred' | 'ssh_key';
   source: string;
   description: string;
   createdAt: string;
